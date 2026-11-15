@@ -17,6 +17,12 @@ streamlit run app.py
 Optional theme: create a folder named `.streamlit` and put `config.toml` inside it.
 Deploy on share.streamlit.io with main file `app.py`.
 
+## Optional artwork (makes the website look like the mockup)
+Put these image files next to `app.py` (or in an `assets` folder). PNG, JPG or WEBP all work. If a file is missing, a built-in drawing is used.
+- `hero_bg`: wide green banner background (mosque skyline)
+- `login_art`: square illustration for the login page
+- `tile_e` (net worth), `tile_g` (zakat due), `tile_s` (gold + silver), `tile_b` (saved), `tile_r` (given): small transparent PNG icons
+
 ## Flutter app
 ```
 flutter create zakhira && cd zakhira

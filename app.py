@@ -1,6 +1,10 @@
 import streamlit as st, json, os, hashlib, base64, datetime as dt, random
+import functools, mimetypes
 import pandas as pd, plotly.express as px, plotly.graph_objects as go
-from hijri_converter import Gregorian
+try:
+    from hijridate import Gregorian
+except ImportError:
+    from hijri_converter import Gregorian
 
 st.set_page_config(page_title="Zakhira", page_icon="🪙", layout="wide")
 DB = "db.json"; TODAY = dt.date.today()
@@ -8,6 +12,18 @@ PAL = ["#0b8a63", "#e2b653", "#7fb99f", "#e27d60", "#5d6f78", "#c8921f", "#8e6bb
 ASSET_TYPES = ["Cash", "Bank balance", "Gold (grams)", "Silver (grams)", "Shares / funds", "Business inventory", "Property for trade"]
 EXP_CATS = ["Food", "Rent", "Bills", "Transport", "Education", "Health", "Family", "Fun", "Other"]
 fmt = lambda x: f"Rs {x:,.0f}"
+DARK = st.session_state.get("theme") == "Dark"
+
+@functools.lru_cache(maxsize=None)
+def img_b64(stem):
+    """Optional artwork: put hero_bg, login_art, tile_e, tile_g, tile_s, tile_b, tile_r (.png/.jpg/.webp) next to app.py or in assets/."""
+    for folder in ("assets", "."):
+        for ext in (".png", ".jpg", ".jpeg", ".webp"):
+            p = os.path.join(folder, stem + ext)
+            if os.path.exists(p):
+                return f"data:{mimetypes.guess_type(p)[0]};base64," + base64.b64encode(open(p, "rb").read()).decode()
+    return None
+
 
 # ---------------- storage (demo JSON file; use Supabase for production) ----------------
 def load(): return json.load(open(DB)) if os.path.exists(DB) else {}
@@ -16,56 +32,100 @@ def hp(p, s): return hashlib.pbkdf2_hmac("sha256", p.encode(), s.encode(), 10000
 db = load()
 
 # ---------------- look and feel ----------------
-st.markdown("""<style>
-.hero{background:linear-gradient(120deg,#063f2e,#0b8a63 55%,#e2b653);border-radius:26px;padding:26px 30px;color:#fff;display:flex;gap:22px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
-.hero h1{margin:0;font-size:2.2rem;color:#fff}.hero p{margin:6px 0 0;opacity:.93;font-size:1.05rem}
-.tile{border-radius:22px;padding:16px 18px;color:#fff;margin-bottom:10px;box-shadow:0 6px 16px rgba(0,0,0,.12)}
-.tile small{opacity:.9;font-size:.9rem}.tile b{font-size:1.5rem;display:block}
-.g{background:linear-gradient(135deg,#8a6d2f,#d9b24c)}.s{background:linear-gradient(135deg,#5d6f78,#9fb0b9)}
-.e{background:linear-gradient(135deg,#064a37,#2bb585)}.r{background:linear-gradient(135deg,#7a2b3a,#e27d60)}.b{background:linear-gradient(135deg,#1f5f7a,#6cc3e0)}
-.card{background:rgba(11,138,99,.07);border:1px solid rgba(11,138,99,.18);border-radius:20px;padding:14px 18px;margin:6px 0}
-.tip{background:linear-gradient(120deg,rgba(226,182,83,.28),rgba(226,182,83,.08));border-radius:20px;padding:16px 20px;margin-top:10px}
-.rem{border-left:6px solid #0b8a63;background:rgba(11,138,99,.08);padding:9px 14px;border-radius:10px;margin:5px 0}
-.rem.late{border-color:#c0392b;background:rgba(192,57,43,.1)}.rem.soon{border-color:#e2b653;background:rgba(226,182,83,.17)}
-.av{width:86px;height:86px;border-radius:50%;object-fit:cover;border:4px solid #e2b653}
-</style>""", unsafe_allow_html=True)
+PATTERN = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><g fill='none' stroke='%230b6e4f' stroke-opacity='.09' stroke-width='1.2'><rect x='40' y='40' width='40' height='40'/><rect x='40' y='40' width='40' height='40' transform='rotate(45 60 60)'/><circle cx='60' cy='60' r='30'/></g></svg>"
+SKYLINE = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 160' preserveAspectRatio='xMaxYMax meet'><g fill='%23f3e3b3' fill-opacity='.33'><rect x='40' y='60' width='12' height='100'/><polygon points='40,60 46,30 52,60'/><rect x='90' y='85' width='60' height='75'/><path d='M90 85a30 30 0 0 1 60 0z'/><rect x='210' y='95' width='190' height='65'/><path d='M240 95a60 55 0 0 1 120 0z'/><rect x='296' y='24' width='8' height='22'/><circle cx='300' cy='20' r='5'/><rect x='425' y='50' width='14' height='110'/><polygon points='425,50 432,18 439,50'/><rect x='480' y='72' width='80' height='88'/><path d='M480 72a40 38 0 0 1 80 0z'/><rect x='540' y='40' width='12' height='120'/><polygon points='540,40 546,10 552,40'/></g></svg>"
+CSS = """<style>
+.stApp{background-color:#f4efe3;background-image:url("PATTERN");}
+[data-testid="stHeader"]{background:transparent}
+section[data-testid="stSidebar"]>div:first-child{background:rgba(255,255,255,.78);backdrop-filter:blur(14px);border-radius:26px;margin:12px 0 12px 12px;height:calc(100vh - 24px);box-shadow:0 10px 36px rgba(6,64,50,.18);border:1px solid rgba(255,255,255,.7)}
+section[data-testid="stSidebar"]{background:transparent}
+[data-testid="stSidebar"] [role=radiogroup]{gap:2px}
+[data-testid="stSidebar"] [role=radiogroup] label{padding:7px 12px;border-radius:14px;width:100%;border-left:4px solid transparent}
+[data-testid="stSidebar"] [role=radiogroup] label>div:first-child{display:none}
+[data-testid="stSidebar"] [role=radiogroup] label:has(input:checked){background:rgba(11,138,99,.13);border-left-color:#0b8a63;font-weight:600}
+[data-testid="stSidebar"] .stButton>button{background:linear-gradient(135deg,#b3263e,#d6455d);color:#fff;border:0;border-radius:999px;width:100%;padding:.6rem}
+.stButton>button[kind="primary"],.stDownloadButton>button{background:linear-gradient(135deg,#b3263e,#d6455d);color:#fff;border:0;border-radius:999px;padding:.55rem 1.6rem;font-weight:600;box-shadow:0 6px 16px rgba(179,38,62,.3)}
+.stButton>button{border-radius:999px}
+.hero{background:url("SKYLINE") no-repeat right bottom/auto 92%,linear-gradient(110deg,#063f2e,#0b8a63 60%,#c9b24a);border-radius:26px;padding:26px 34px;color:#fff;display:flex;gap:26px;align-items:center;flex-wrap:wrap;margin-bottom:16px;box-shadow:0 12px 30px rgba(6,64,50,.28)}
+.hero h1{margin:0;font-size:2.2rem;color:#fff;font-weight:800}.hero p{margin:6px 0 0;opacity:.95;font-size:1.02rem;max-width:640px;color:#fff}
+.tile{position:relative;overflow:hidden;border-radius:22px;padding:16px 18px;color:#fff;margin-bottom:10px;box-shadow:0 8px 20px rgba(0,0,0,.14);min-height:96px}
+.tile small{opacity:.92;font-size:.92rem}.tile b{font-size:1.75rem;display:block;color:inherit}
+.tile .art{position:absolute;right:12px;bottom:8px;font-size:3rem;opacity:.9;max-height:76px;filter:drop-shadow(0 4px 6px rgba(0,0,0,.25))}
+.g{background:linear-gradient(135deg,#8a6d2f,#d9b24c);border:2px solid #f3d37a;box-shadow:0 0 0 3px rgba(226,182,83,.25),0 8px 20px rgba(0,0,0,.14)}
+.s{background:linear-gradient(135deg,#6f8089,#b9c6cd);border:2px solid #fff}
+.e{background:linear-gradient(135deg,#064a37,#2bb585);border:2px solid #7ee2bd;box-shadow:0 0 0 3px rgba(43,181,133,.25),0 8px 20px rgba(0,0,0,.14)}
+.r{background:linear-gradient(135deg,#7a2b3a,#e27d60)}.b{background:linear-gradient(135deg,#1f5f7a,#6cc3e0)}
+.card{background:rgba(255,255,255,.7);border:1px solid rgba(11,138,99,.18);border-radius:20px;padding:14px 18px;margin:6px 0;backdrop-filter:blur(6px)}
+.tip{background:linear-gradient(120deg,rgba(226,182,83,.3),rgba(226,182,83,.08));border-radius:20px;padding:16px 20px;margin-top:10px}
+.rem{border-left:6px solid #0b8a63;background:rgba(11,138,99,.09);padding:9px 14px;border-radius:12px;margin:5px 0}
+.rem.late{border-color:#c0392b;background:rgba(192,57,43,.1)}.rem.soon{border-color:#e2b653;background:rgba(226,182,83,.18)}
+.av{width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid #e2b653}
+.loginart svg,.loginart img{width:100%;max-width:460px;border-radius:30px;display:block;margin:auto;filter:drop-shadow(0 12px 24px rgba(6,64,50,.25))}
+</style>""".replace("PATTERN", PATTERN).replace("SKYLINE", SKYLINE)
+DARK_CSS = """<style>
+.stApp{background-color:#0a1f1a !important;background-image:none !important}
+.stApp,.stApp p,.stApp label,.stApp li,.stApp h1,.stApp h2,.stApp h3,.stApp h4,.stApp span,[data-testid="stMetricValue"],[data-testid="stMetricLabel"]{color:#eaf3ef}
+.hero h1,.hero p,.tile,.tile *{color:#fff !important}
+section[data-testid="stSidebar"]>div:first-child{background:rgba(17,48,42,.88);border-color:rgba(255,255,255,.08)}
+.card{background:rgba(17,48,42,.8);border-color:rgba(255,255,255,.1)}
+input,textarea,[data-baseweb=select]>div,[data-baseweb=input]{background:#11302a !important;color:#eaf3ef !important}
+[data-testid="stExpander"],[data-testid="stVerticalBlockBorderWrapper"]{border-color:rgba(255,255,255,.12)}
+</style>"""
+st.markdown(CSS, unsafe_allow_html=True)
+if DARK: st.markdown(DARK_CSS, unsafe_allow_html=True)
 
-ART = """<svg width="250" height="105" viewBox="0 0 260 110"><defs>
+ART = """<svg width="230" height="110" viewBox="0 0 240 115"><defs>
 <linearGradient id="a" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff2b0"/><stop offset="1" stop-color="#c8921f"/></linearGradient>
-<linearGradient id="b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#9aa7ae"/></linearGradient></defs>
-<polygon points="10,95 30,55 120,55 140,95" fill="url(#a)" stroke="#8a6d2f"/><text x="75" y="82" font-size="14" text-anchor="middle" fill="#6b4e12" font-weight="700">GOLD</text>
-<circle cx="185" cy="55" r="34" fill="url(#b)" stroke="#6b7a82" stroke-width="3"/><text x="185" y="62" font-size="18" text-anchor="middle" fill="#445" font-weight="700">AG</text>
-<rect x="190" y="18" width="62" height="34" rx="5" fill="#2e8b57" stroke="#fff" transform="rotate(12 220 35)"/><text x="221" y="42" font-size="13" fill="#fff" text-anchor="middle" font-weight="700" transform="rotate(12 220 35)">Rs 5000</text></svg>"""
+<radialGradient id="b" cx=".35" cy=".3" r=".9"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#9aa7ae"/></radialGradient></defs>
+<polygon points="4,100 26,58 126,58 148,100" fill="url(#a)" stroke="#8a6d2f"/><text x="76" y="88" font-size="14" text-anchor="middle" fill="#6b4e12" font-weight="800">GOLD</text>
+<circle cx="168" cy="58" r="48" fill="url(#b)" stroke="#7d8c94" stroke-width="3"/><circle cx="168" cy="58" r="40" fill="none" stroke="#8d9aa1" stroke-width="2" stroke-dasharray="3 3"/>
+<text x="168" y="64" font-size="17" text-anchor="middle" fill="#445" font-weight="800">Rs 5000</text></svg>"""
+TILE_ART = {"e": "🌳", "g": "🤲", "s": "🥇", "b": "🐷", "r": "🕌"}
+LOGIN_SVG = """<div class="loginart"><svg viewBox="0 0 400 400"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0b8a63"/><stop offset="1" stop-color="#064032"/></linearGradient></defs>
+<circle cx="200" cy="200" r="190" fill="url(#lg)"/><circle cx="285" cy="105" r="40" fill="#f3d37a"/><circle cx="302" cy="95" r="36" fill="#0a7a58"/>
+<rect x="105" y="170" width="16" height="130" fill="#f3e3b3"/><polygon points="105,170 113,130 121,170" fill="#e2b653"/><rect x="279" y="170" width="16" height="130" fill="#f3e3b3"/><polygon points="279,170 287,130 295,170" fill="#e2b653"/>
+<rect x="145" y="200" width="110" height="100" fill="#f3e3b3"/><path d="M145 200a55 55 0 0 1 110 0z" fill="#e2b653"/><rect x="198" y="130" width="4" height="30" fill="#e2b653"/>
+<rect x="188" y="245" width="24" height="55" rx="12" fill="#0b6e4f"/>
+<ellipse cx="200" cy="332" rx="70" ry="14" fill="#c8921f"/><ellipse cx="200" cy="322" rx="70" ry="14" fill="#e2b653"/><ellipse cx="200" cy="312" rx="70" ry="14" fill="#f3d37a"/></svg></div>"""
 def hero(sub, title="🪙 Zakhira"):
-    st.markdown(f'<div class="hero"><div>{ART}</div><div><h1>{title}</h1><p>{sub}</p></div></div>', unsafe_allow_html=True)
+    bg = img_b64("hero_bg")
+    style_ = f' style="background-image:linear-gradient(100deg,rgba(6,64,50,.93),rgba(6,64,50,.25)),url({bg});background-size:cover;background-position:right"' if bg else ""
+    st.markdown(f'<div class="hero"{style_}><div>{ART}</div><div><h1>{title}</h1><p>{sub}</p></div></div>', unsafe_allow_html=True)
 def tile(label, value, cls, icon=""):
-    return f'<div class="tile {cls}"><small>{icon} {label}</small><b>{value}</b></div>'
+    im = img_b64(f"tile_{cls}")
+    art = f'<img class="art" src="{im}">' if im else f'<span class="art">{TILE_ART.get(cls, "")}</span>'
+    return f'<div class="tile {cls}"><small>{icon} {label}</small><b>{value}</b>{art}</div>'
 def style(fig, h=300):
-    fig.update_layout(height=h, margin=dict(l=10, r=10, t=45, b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", colorway=PAL)
+    fig.update_layout(height=h, margin=dict(l=10, r=10, t=45, b=10), paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", colorway=PAL, font_color=("#eaf3ef" if DARK else "#1e2a27"))
     st.plotly_chart(fig, width="stretch")
 
 # ---------------- auth ----------------
 if "me" not in st.session_state: st.session_state.me = None
 if not st.session_state.me:
     hero("Your all-in-one halal money companion: wealth, zakat, budgeting, goals, investing and giving.")
-    t1, t2 = st.tabs(["Log in", "Create account"])
-    with t1:
-        e = st.text_input("Email", key="le").strip().lower(); p = st.text_input("Password", type="password", key="lp")
-        if st.button("Log in", type="primary"):
-            u = db.get(e)
-            if u and u["pw"] == hp(p, u["salt"]): st.session_state.me = e; st.rerun()
-            else: st.error("Email or password is incorrect.")
-    with t2:
-        n = st.text_input("Full name"); e2 = st.text_input("Email", key="re").strip().lower()
-        p2 = st.text_input("Password (6+ characters)", type="password", key="rp")
-        c1, c2 = st.columns(2)
-        fiqh = c1.selectbox("Fiqh", ["Hanafi", "Shafi", "Maliki", "Hanbali", "Jafari"]); zd = c2.date_input("Your zakat date", TODAY)
-        if st.button("Create account", type="primary"):
-            if not n or "@" not in e2 or len(p2) < 6: st.error("Enter your name, a valid email and a 6+ character password.")
-            elif e2 in db: st.error("This email is already registered.")
-            else:
-                s = os.urandom(8).hex(); db[e2] = {"name": n, "pw": hp(p2, s), "salt": s, "fiqh": fiqh, "zdate": str(zd), "photo": ""}
-                save(); st.session_state.me = e2; st.rerun()
+    ca, cb = st.columns([1, 1.1], gap="large")
+    with ca:
+        la = img_b64("login_art")
+        st.markdown(f'<div class="loginart"><img src="{la}"></div>' if la else LOGIN_SVG, unsafe_allow_html=True)
+    with cb:
+        t1, t2 = st.tabs(["Log in", "Create account"])
+        with t1:
+            e = st.text_input("Email", key="le").strip().lower(); p = st.text_input("Password", type="password", key="lp")
+            if st.button("Log in", type="primary"):
+                u = db.get(e)
+                if u and u["pw"] == hp(p, u["salt"]): st.session_state.me = e; st.rerun()
+                else: st.error("Email or password is incorrect.")
+        with t2:
+            n = st.text_input("Full name"); e2 = st.text_input("Email", key="re").strip().lower()
+            p2 = st.text_input("Password (6+ characters)", type="password", key="rp")
+            c1, c2 = st.columns(2)
+            fiqh = c1.selectbox("Fiqh", ["Hanafi", "Shafi", "Maliki", "Hanbali", "Jafari"]); zd = c2.date_input("Your zakat date", TODAY)
+            if st.button("Create account", type="primary"):
+                if not n or "@" not in e2 or len(p2) < 6: st.error("Enter your name, a valid email and a 6+ character password.")
+                elif e2 in db: st.error("This email is already registered.")
+                else:
+                    s_ = os.urandom(8).hex(); db[e2] = {"name": n, "pw": hp(p2, s_), "salt": s_, "fiqh": fiqh, "zdate": str(zd), "photo": ""}
+                    save(); st.session_state.me = e2; st.rerun()
     st.stop()
 
 me = st.session_state.me; u = db[me]
@@ -115,13 +175,15 @@ PAGES = ["🏠 Dashboard", "💰 Assets", "🧮 Zakat", "💸 Income & Expenses"
 KEYS = {"gold": 1, "silver": 1, "nisab": 2, "zakat": 2, "budget": 3, "expense": 3, "income": 3, "hajj": 4, "umrah": 4, "goal": 4, "saving": 4, "loan": 5, "qarz": 5, "bc": 5, "committee": 5, "debt": 5, "sip": 6, "invest": 6, "halal": 6,
         "sadaqah": 7, "charity": 7, "fitrana": 8, "qurbani": 8, "ramadan": 8, "inherit": 9, "faraid": 9, "will": 9, "remind": 10, "learn": 11, "riba": 11, "report": 12, "photo": 13, "profile": 13}
 with st.sidebar:
-    if u["photo"]: st.markdown(f'<img class="av" src="data:image/png;base64,{u["photo"]}">', unsafe_allow_html=True)
-    st.subheader(f"Assalamualaikum, {u['name'].split()[0]}")
+    c1, c2 = st.columns([1, 3])
+    if u["photo"]: c1.markdown(f'<img class="av" style="width:44px;height:44px" src="data:image/png;base64,{u["photo"]}">', unsafe_allow_html=True)
+    else: c1.markdown('<div style="font-size:2rem">🪙</div>', unsafe_allow_html=True)
+    c2.markdown(f"**{u['name'].split()[0]}**<br><small>Assalamualaikum</small>", unsafe_allow_html=True)
     page = st.radio("Menu", PAGES, label_visibility="collapsed")
-    q = st.text_input("🔎 Search (gold, hajj, bc, sip...)").lower().strip()
+    st.segmented_control("Theme", ["Light", "Dark"], default="Light", key="theme", label_visibility="collapsed")
+    q = st.text_input("Search", placeholder="Search (gold, hajj, bc, sip...)", label_visibility="collapsed").lower().strip()
     for k, i in KEYS.items():
         if q and q in k: st.info(f"Try → {PAGES[i]}"); break
-    st.caption("Dark / light: ⋮ menu (top right) → Settings → Theme.")
     if st.button("Log out"): st.session_state.me = None; st.rerun()
 
 # ---------------- pages ----------------
