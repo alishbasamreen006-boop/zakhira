@@ -1,0 +1,9 @@
+db.json
+__pycache__/
+*.pyc
+.venv/
+.dart_tool/
+build/
+.idea/
+.DS_Store
+*.iml
